@@ -41,7 +41,7 @@ for (const file of commandFiles) {
 try {
     client.user.setActivity("커피 마시면서 디스코드", { type: "WATCHING" });
 } catch (err) {
-    console.log(err);
+    console.error(err);
 }
 
 // 명령어 실행
