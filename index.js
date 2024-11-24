@@ -38,11 +38,16 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-try {
-    client.user.setActivity("커피 마시면서 디스코드", { type: "WATCHING" });
-} catch (err) {
-    console.error(err);
-}
+client.once('ready', () => {
+    console.log('봇이 준비되었습니다!');
+
+    try {
+        client.user.setActivity('커피 마시면서 디스코드', { type: 'WATCHING' });
+        console.log('상태 설정 완료!');
+    } catch (err) {
+        console.error('상태 설정 중 오류 발생:', err);
+    }
+});
 
 // 명령어 실행
 client.on('interactionCreate', async interaction => {
