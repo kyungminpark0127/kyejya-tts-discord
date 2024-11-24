@@ -38,10 +38,10 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-client.user.setActivity('커피 마시면서 디스코드', { type: 'WATCHING' })
-    .then(() => console.log('상태가 정상으로 설정되었습니다.'))
-    .catch(err => console.error('상태설정중에 에러가 발생했습니다:', err));
-
+client.once('ready', () => {
+    console.log('ボットの準備ができました！');
+    client.user.setActivity('コーヒーを飲みながらディスコード', { type: 'WATCHING' }); // 상태 설정
+});
 
 // 명령어 실행
 client.on('interactionCreate', async interaction => {
@@ -60,17 +60,25 @@ client.on('interactionCreate', async interaction => {
 });
 
 // 서버에 봇이 추가되었을 때 tts 채널 생성
+const { ChannelType } = require('discord.js');
+
 client.on('guildCreate', async guild => {
-    let ttsChannel = guild.channels.cache.find(channel => channel.name === 'tts' && channel.type === 'GUILD_TEXT');
+    // 'tts-ja' 채널을 찾기
+    let ttsChannel = guild.channels.cache.find(
+        channel => channel.name === 'tts-ja' && channel.type === ChannelType.GuildText
+    );
+
     if (!ttsChannel) {
         try {
-            ttsChannel = await guild.channels.create('tts', {
-                type: 'GUILD_TEXT',
-                reason: 'TTS 봇용 채널 생성'
+            // 채널 생성
+            ttsChannel = await guild.channels.create({
+                name: 'tts-ja', // 채널 이름
+                type: ChannelType.GuildText, // 텍스트 채널로 지정
+                reason: 'TTS 봇용 채널 생성' // 로그에 표시할 이유
             });
-            console.log(`'tts' 채널을 ${guild.name} 서버에 생성했습니다.`);
+            console.log(`'tts-ja' 채널을 ${guild.name} 서버에 생성했습니다.`);
         } catch (error) {
-            console.error(`'tts' 채널 생성 중 오류가 발생했습니다: ${error}`);
+            console.error(`'tts-ja' 채널 생성 중 오류가 발생했습니다: ${error}`);
         }
     }
 });
@@ -81,10 +89,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     // 봇이 음성 채널에 있고, 유저가 봇과 같은 채널에 들어왔을 때
     if (connection && newState.channelId === connection.joinConfig.channelId && oldState.channelId !== newState.channelId) {
         const username = newState.member.displayName;
-        const welcomeMessage = `${username}님이 들어오셨어요`;
+        const welcomeMessage = `${username}さんが入場しました`;
 
         // TTS 음성 생성 및 재생
-        const gtts = new gTTS(welcomeMessage, 'ko');
+        const gtts = new gTTS(welcomeMessage, 'ja');
         gtts.save('welcome.mp3', (err) => {
             if (err) {
                 console.error('TTS 생성 오류:', err);
@@ -100,10 +108,10 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     // 유저가 봇과 같은 채널에서 나갔을 때
     if (connection && oldState.channelId === connection.joinConfig.channelId && newState.channelId !== oldState.channelId) {
         const username = oldState.member.displayName;
-        const goodbyeMessage = `${username}님이 나가셨어요`;
+        const goodbyeMessage = `${username}さんが退場されました`;
 
         // TTS 음성 생성 및 재생
-        const gtts = new gTTS(goodbyeMessage, 'ko');
+        const gtts = new gTTS(goodbyeMessage, 'ja');
         gtts.save('goodbye.mp3', (err) => {
             if (err) {
                 console.error('TTS 생성 오류:', err);
@@ -122,11 +130,11 @@ client.on('messageCreate', async message => {
     if (message.author.bot) return; // 봇 메시지는 무시합니다.
 
     // TTS 채널에서만 동작하도록 채널 검사
-    if (message.channel.name === 'tts') {
+    if (message.channel.name === 'tts-ja') {
         const voiceChannel = message.member.voice.channel;
         if (voiceChannel) {
             // TTS 변환 및 파일 저장
-            const gtts = new gTTS(message.content, 'ko'); // 한국어 설정
+            const gtts = new gTTS(message.content, 'ja'); // 일본어 설정
             gtts.save('tts-audio.mp3', function (err) {
                 if (err) {
                     console.error('TTS 변환 중 오류가 발생했습니다:', err);
@@ -145,7 +153,7 @@ client.on('messageCreate', async message => {
                 connection.subscribe(player);
             });
         } else {
-            message.reply('음성 채널에 들어가주세요!');
+            message.reply('ボイスチャンネルに入ってください！');
         }
     }
 });
