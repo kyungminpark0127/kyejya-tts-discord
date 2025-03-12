@@ -10,7 +10,7 @@ module.exports = {
             .setColor('#2ecc71')
             .setTitle('🌱 봇 소개 🌱')
             .setDescription('이 봇의 사용법과 안내에 대한 내용이에요!')
-            .setThumbnail('https://ifh.cc/v-yklmVx')
+            .setThumbnail('https://ibb.co/KxDm342f')
             .addFields(
                 { name: '**제작자**', value: 'Aiden_P', inline: true },
                 { name: '**용도**', value: '아주 예의바른 TTS봇', inline: true },
