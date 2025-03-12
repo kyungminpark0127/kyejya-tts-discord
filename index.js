@@ -17,7 +17,7 @@ client.commands = new Collection();
 const mongoose = require('mongoose');
 
 // MongoDB URI
-const MONGO_URI = 'mongodb+srv://kyejya:jasmin2005%40@discord-kyejya-tts.on4nh.mongodb.net/?retryWrites=true&w=majority&appName=Discord-kyejya-tts';
+const MONGO_URI = process.env.MONGO_URI;
 
 // MongoDB 연결 설정
 mongoose.connect(MONGO_URI)
