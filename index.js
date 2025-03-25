@@ -16,8 +16,12 @@ const client = new Client({
 client.commands = new Collection();
 const mongoose = require('mongoose');
 
+let messageQueue = [];
+let isSpeaking = false;
+let connection = null;
+
 // MongoDB URI
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = 'mongodb+srv://hjeepark2005:iloveyoumylove@kj-cluster.n2guy.mongodb.net/?retryWrites=true&w=majority&appName=KJ-Cluster';
 
 // MongoDB 연결 설정
 mongoose.connect(MONGO_URI)
@@ -123,37 +127,70 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
     }
 });
 
-// 메시지 수신 및 TTS 처리
-client.on('messageCreate', async message => {
-    if (message.author.bot) return; // 봇 메시지는 무시합니다.
+client.on('messageCreate', async (message) => {
+    if (message.author.bot) return;
 
-    // TTS 채널에서만 동작하도록 채널 검사
-    if (message.channel.name === 'tts') {
-        const voiceChannel = message.member.voice.channel;
-        if (voiceChannel) {
-            // TTS 변환 및 파일 저장
-            const gtts = new gTTS(message.content, 'ko'); // 한국어 설정
-            gtts.save('tts-audio.mp3', function (err) {
-                if (err) {
-                    console.error('TTS 변환 중 오류가 발생했습니다:', err);
-                    return;
-                }
+    const ttsChannelName = 'tts'; // TTS 채널 이름
+    if (message.channel.name !== ttsChannelName) return;
 
-                const connection = joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: message.guild.id,
-                    adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-                });
-
-                const player = createAudioPlayer();
-                const resource = createAudioResource('tts-audio.mp3');
-                player.play(resource);
-                connection.subscribe(player);
-            });
-        } else {
-            message.reply('음성 채널에 들어가주세요!');
-        }
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+        message.reply('음성 채널에 들어가주세요!');
+        return;
     }
+
+    messageQueue.push(message);
+
+    if (!connection || connection.joinConfig.channelId !== voiceChannel.id) {
+        connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: message.guild.id,
+            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+        });
+    }
+
+    if (!isSpeaking) processQueue();
 });
+
+async function processQueue() {
+    if (isSpeaking || messageQueue.length === 0) return;
+
+    isSpeaking = true;
+    const message = messageQueue.shift();
+
+    try {
+        const uniqueFileName = `tts-audio-${Date.now()}.mp3`; // 고유한 파일명 생성
+        const gtts = new gTTS(message.content, 'ko');
+
+        gtts.save(uniqueFileName, async (err) => {
+            if (err) {
+                console.error('TTS 변환 중 오류가 발생했습니다:', err);
+                isSpeaking = false;
+                processQueue(); // 다음 메시지 처리
+                return;
+            }
+
+            const player = createAudioPlayer();
+            const resource = createAudioResource(uniqueFileName);
+            player.play(resource);
+            connection.subscribe(player);
+
+            player.on('idle', () => {
+                isSpeaking = false;
+                processQueue();
+            });
+
+            player.on('error', (err) => {
+                console.error('플레이어 오류:', err);
+                isSpeaking = false;
+                processQueue();
+            });
+        });
+    } catch (err) {
+        console.error('오류 발생:', err);
+        isSpeaking = false;
+        processQueue();
+    }
+}
 
 client.login(process.env.DISCORD_TOKEN);
