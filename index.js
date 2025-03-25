@@ -21,7 +21,7 @@ let isSpeaking = false;
 let connection = null;
 
 // MongoDB URI
-const MONGO_URI = 'mongodb+srv://hjeepark2005:iloveyoumylove@kj-cluster.n2guy.mongodb.net/?retryWrites=true&w=majority&appName=KJ-Cluster';
+const MONGO_URI = 'mongodb+srv://hjeepark2005:jasmin2005%40@kj-cluster.n2guy.mongodb.net/?retryWrites=true&w=majority&appName=KJ-Cluster';
 
 // MongoDB 연결 설정
 mongoose.connect(MONGO_URI)
