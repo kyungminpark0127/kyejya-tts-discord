@@ -130,38 +130,70 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 });
 
 client.on('messageCreate', async (message) => {
+    // 봇의 메시지는 무시
     if (message.author.bot) return;
 
     const ttsChannelName = 'tts'; // TTS 채널 이름
-    if (message.channel.name !== ttsChannelName) return;
+    // 채널 이름 비교 시 대소문자 구분 제거
+    if (message.channel.name.toLowerCase() !== ttsChannelName) return;
 
+    // 보이스 채널에 있는지 확인
     const voiceChannel = message.member.voice.channel;
     if (!voiceChannel) {
         message.reply('음성 채널에 들어가주세요!');
         return;
     }
 
-    messageQueue.push(message);
-
-    if (!connection || connection.joinConfig.channelId !== voiceChannel.id) {
-        connection = joinVoiceChannel({
-            channelId: voiceChannel.id,
-            guildId: message.guild.id,
-            adapterCreator: voiceChannel.guild.voiceAdapterCreator,
-        });
+    // 메시지 내용 길이 제한 (선택사항)
+    if (message.content.length > 200) {
+        message.reply('메시지가 너무 깁니다. 200자 이내로 줄여주세요.');
+        return;
     }
 
-    if (!isSpeaking) processQueue();
+    // 디버그 로그 추가
+    console.log(`TTS 메시지 수신: ${message.content}`);
+    console.log(`음성 채널: ${voiceChannel.name}`);
+
+    messageQueue.push(message);
+
+    // 음성 연결 로직 개선
+    try {
+        if (!connection || connection.joinConfig.channelId !== voiceChannel.id) {
+            connection = joinVoiceChannel({
+                channelId: voiceChannel.id,
+                guildId: message.guild.id,
+                adapterCreator: voiceChannel.guild.voiceAdapterCreator,
+            });
+            console.log('새 음성 연결 생성');
+        }
+    } catch (error) {
+        console.error('음성 채널 연결 중 오류:', error);
+        message.reply('음성 채널 연결 중 오류가 발생했습니다.');
+        return;
+    }
+
+    // 큐 처리 시작
+    if (!isSpeaking) {
+        console.log('큐 처리 시작');
+        processQueue();
+    }
 });
 
 async function processQueue() {
-    if (isSpeaking || messageQueue.length === 0) return;
+    if (isSpeaking || messageQueue.length === 0) {
+        console.log(`현재 상태 - isSpeaking: ${isSpeaking}, 큐 길이: ${messageQueue.length}`);
+        return;
+    }
 
     isSpeaking = true;
     const message = messageQueue.shift();
 
     try {
         const uniqueFileName = `tts-audio-${Date.now()}.mp3`; // 고유한 파일명 생성
+        
+        // 디버그 로그 추가
+        console.log(`현재 처리 메시지: ${message.content}`);
+
         const gtts = new gTTS(message.content, 'ko');
 
         gtts.save(uniqueFileName, async (err) => {
@@ -172,12 +204,21 @@ async function processQueue() {
                 return;
             }
 
+            console.log(`TTS 오디오 파일 생성됨: ${uniqueFileName}`);
+
             const player = createAudioPlayer();
             const resource = createAudioResource(uniqueFileName);
             player.play(resource);
-            connection.subscribe(player);
+            
+            try {
+                connection.subscribe(player);
+                console.log('오디오 플레이어에 연결됨');
+            } catch (subscribeError) {
+                console.error('오디오 플레이어 연결 중 오류:', subscribeError);
+            }
 
             player.on('idle', () => {
+                console.log('오디오 재생 완료');
                 isSpeaking = false;
                 processQueue();
             });
@@ -189,7 +230,7 @@ async function processQueue() {
             });
         });
     } catch (err) {
-        console.error('오류 발생:', err);
+        console.error('전체 프로세스 오류:', err);
         isSpeaking = false;
         processQueue();
     }
