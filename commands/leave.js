@@ -9,6 +9,9 @@ module.exports = {
         .setDescription('봇이 현재 음성 채널에서 나갑니다.'),
 
     async execute(interaction) {
+        // 먼저 응답을 미리 보내고, 작업이 완료되면 업데이트
+        await interaction.deferReply();
+
         const connection = getVoiceConnection(interaction.guild.id);
 
         if (connection) {
@@ -17,30 +20,22 @@ module.exports = {
             gtts.save('leave.mp3', async (err) => {
                 if (err) {
                     console.error('TTS 생성 오류:', err);
+                    await interaction.editReply('TTS 생성 오류가 발생했습니다.');
                     return;
                 }
+
                 const player = createAudioPlayer();
                 const resource = createAudioResource('./leave.mp3');
                 player.play(resource);
                 connection.subscribe(player);
 
-                // MongoDB에서 TTS 채널 ID 불러오기
-                try {
-                    const settings = await GuildSettings.findOne({ guildId: interaction.guild.id });
-                    if (settings && settings.ttsChannelId) {
-                        console.log('TTS 채널 ID:', settings.ttsChannelId);
-                    }
-                } catch (error) {
-                    console.error('MongoDB 불러오기 오류:', error);
-                }
-
-                player.on('idle', () => {
+                player.on('idle', async () => {
                     connection.destroy(); // 음성 출력 후 채널 나가기
-                    interaction.reply('음성 채널에서 퇴장했습니다!');
+                    await interaction.editReply('음성 채널에서 퇴장했습니다!');
                 });
             });
         } else {
-            await interaction.reply('봇이 현재 음성 채널에 없습니다.');
+            await interaction.editReply('봇이 현재 음성 채널에 없습니다.');
         }
     },
 };

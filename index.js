@@ -71,17 +71,19 @@ client.on('interactionCreate', async interaction => {
 
 // 서버에 봇이 추가되었을 때 tts 채널 생성
 client.on('guildCreate', async guild => {
-    let ttsChannel = guild.channels.cache.find(channel => channel.name === 'tts' && channel.type === 'GUILD_TEXT');
-    if (!ttsChannel) {
-        try {
-            ttsChannel = await guild.channels.create('tts', {
-                type: 'GUILD_TEXT',
+    try {
+        let ttsChannel = guild.channels.cache.find(channel => channel.name === 'tts' && channel.type === 0); // 텍스트 채널 타입은 0
+        
+        if (!ttsChannel) {
+            ttsChannel = await guild.channels.create({
+                name: 'tts',
+                type: 0, // 텍스트 채널
                 reason: 'TTS 봇용 채널 생성'
             });
             console.log(`'tts' 채널을 ${guild.name} 서버에 생성했습니다.`);
-        } catch (error) {
-            console.error(`'tts' 채널 생성 중 오류가 발생했습니다: ${error}`);
         }
+    } catch (error) {
+        console.error(`'tts' 채널 생성 중 오류가 발생했습니다: ${error}`);
     }
 });
 
