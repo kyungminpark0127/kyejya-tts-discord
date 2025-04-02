@@ -17,6 +17,7 @@ const client = new Client({
 client.commands = new Collection();
 const mongoose = require('mongoose');
 
+// 전역 변수 선언
 let messageQueue = [];
 let isSpeaking = false;
 let connection = null;
@@ -109,15 +110,9 @@ client.on('messageReactionAdd', async (reaction, user) => {
         const parentThread = message.channel;
         
         try {
-            // 최신 Discord.js에서는 fetchStarterMessage 대신 다음과 같이 사용할 수 있습니다
-            const starterMessage = await parentThread.fetchStarterMessage().catch(async () => {
-                // fetchStarterMessage가 없는 경우 대체 방법
-                // 1. 스레드의 메시지 histroy를 가져와 첫 번째 메시지 사용
-                const messages = await parentThread.messages.fetch({ limit: 1, after: '0' });
-                return messages.first();
-                // 또는
-                // 2. parentThread.messages.fetchPinned()를 사용하여 핀 메시지 확인
-            });
+            // 최신 Discord.js에서는 이렇게 스레드의 시작 메시지를 가져올 수 있습니다
+            const messages = await parentThread.messages.fetch({ limit: 1, after: '0' });
+            const starterMessage = messages.first();
             
             console.log('출석 체크 처리 중...');
             // 여기에 출석 체크 로직 추가
@@ -131,7 +126,13 @@ client.on('messageReactionAdd', async (reaction, user) => {
 });
 
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
-    const connection = getVoiceConnection(newState.guild.id);
+    // 전역 connection 변수를 사용하되, 현재 상태를 반영하기 위해 확인
+    if (newState.guild && newState.guild.id) {
+        const currentConnection = getVoiceConnection(newState.guild.id);
+        if (currentConnection) {
+            connection = currentConnection;
+        }
+    }
 
     // 봇이 음성 채널에 있고, 유저가 봇과 같은 채널에 들어왔을 때
     if (connection && newState.channelId === connection.joinConfig.channelId && oldState.channelId !== newState.channelId) {
@@ -140,15 +141,49 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
         // TTS 음성 생성 및 재생
         const gtts = new gTTS(welcomeMessage, 'ko');
-        gtts.save('welcome.mp3', (err) => {
+        const welcomeFilePath = path.join(__dirname, 'welcome.mp3');
+        
+        gtts.save(welcomeFilePath, (err) => {
             if (err) {
                 console.error('TTS 생성 오류:', err);
                 return;
             }
-            const player = createAudioPlayer();
-            const resource = createAudioResource('./welcome.mp3');
-            player.play(resource);
-            connection.subscribe(player);
+            
+            // 파일이 생성되었는지 확인
+            fs.access(welcomeFilePath, fs.constants.F_OK, (err) => {
+                if (err) {
+                    console.error('TTS 파일이 생성되지 않았습니다:', err);
+                    return;
+                }
+                
+                console.log(`환영 메시지 파일 생성됨: ${welcomeFilePath}`);
+                
+                try {
+                    const player = createAudioPlayer();
+                    const resource = createAudioResource(welcomeFilePath);
+                    
+                    console.log('환영 오디오 리소스 생성됨');
+                    player.play(resource);
+                    console.log('환영 메시지 플레이어 재생 시작');
+                    
+                    connection.subscribe(player);
+                    console.log('환영 메시지 플레이어에 연결됨');
+                    
+                    player.on('idle', () => {
+                        console.log('환영 메시지 재생 완료');
+                        // 파일 삭제 (선택 사항)
+                        fs.unlink(welcomeFilePath, (err) => {
+                            if (err) console.error('임시 파일 삭제 중 오류:', err);
+                        });
+                    });
+                    
+                    player.on('error', (err) => {
+                        console.error('환영 메시지 플레이어 오류:', err);
+                    });
+                } catch (playError) {
+                    console.error('환영 메시지 재생 중 오류:', playError);
+                }
+            });
         });
     }
 
@@ -159,15 +194,49 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
         // TTS 음성 생성 및 재생
         const gtts = new gTTS(goodbyeMessage, 'ko');
-        gtts.save('goodbye.mp3', (err) => {
+        const goodbyeFilePath = path.join(__dirname, 'goodbye.mp3');
+        
+        gtts.save(goodbyeFilePath, (err) => {
             if (err) {
                 console.error('TTS 생성 오류:', err);
                 return;
             }
-            const player = createAudioPlayer();
-            const resource = createAudioResource('./goodbye.mp3');
-            player.play(resource);
-            connection.subscribe(player);
+            
+            // 파일이 생성되었는지 확인
+            fs.access(goodbyeFilePath, fs.constants.F_OK, (err) => {
+                if (err) {
+                    console.error('TTS 파일이 생성되지 않았습니다:', err);
+                    return;
+                }
+                
+                console.log(`작별 인사 파일 생성됨: ${goodbyeFilePath}`);
+                
+                try {
+                    const player = createAudioPlayer();
+                    const resource = createAudioResource(goodbyeFilePath);
+                    
+                    console.log('작별 인사 오디오 리소스 생성됨');
+                    player.play(resource);
+                    console.log('작별 인사 플레이어 재생 시작');
+                    
+                    connection.subscribe(player);
+                    console.log('작별 인사 플레이어에 연결됨');
+                    
+                    player.on('idle', () => {
+                        console.log('작별 인사 재생 완료');
+                        // 파일 삭제 (선택 사항)
+                        fs.unlink(goodbyeFilePath, (err) => {
+                            if (err) console.error('임시 파일 삭제 중 오류:', err);
+                        });
+                    });
+                    
+                    player.on('error', (err) => {
+                        console.error('작별 인사 플레이어 오류:', err);
+                    });
+                } catch (playError) {
+                    console.error('작별 인사 재생 중 오류:', playError);
+                }
+            });
         });
     }
 });
@@ -232,7 +301,8 @@ async function processQueue() {
     const message = messageQueue.shift();
 
     try {
-        const uniqueFileName = `tts-audio-${Date.now()}.mp3`; // 고유한 파일명 생성
+        // 절대 경로로 파일명 설정
+        const uniqueFileName = path.join(__dirname, `tts-audio-${Date.now()}.mp3`);
         
         // 디버그 로그 추가
         console.log(`현재 처리 메시지: ${message.content}`);
@@ -247,29 +317,50 @@ async function processQueue() {
                 return;
             }
 
-            console.log(`TTS 오디오 파일 생성됨: ${uniqueFileName}`);
+            // 파일이 생성되었는지 확인
+            fs.access(uniqueFileName, fs.constants.F_OK, (err) => {
+                if (err) {
+                    console.error('TTS 파일이 생성되지 않았습니다:', err);
+                    isSpeaking = false;
+                    processQueue(); // 다음 메시지 처리
+                    return;
+                }
+                
+                console.log(`TTS 오디오 파일 생성됨: ${uniqueFileName}`);
 
-            const player = createAudioPlayer();
-            const resource = createAudioResource(uniqueFileName);
-            player.play(resource);
-            
-            try {
-                connection.subscribe(player);
-                console.log('오디오 플레이어에 연결됨');
-            } catch (subscribeError) {
-                console.error('오디오 플레이어 연결 중 오류:', subscribeError);
-            }
-
-            player.on('idle', () => {
-                console.log('오디오 재생 완료');
-                isSpeaking = false;
-                processQueue();
-            });
-
-            player.on('error', (err) => {
-                console.error('플레이어 오류:', err);
-                isSpeaking = false;
-                processQueue();
+                try {
+                    const player = createAudioPlayer();
+                    const resource = createAudioResource(uniqueFileName);
+                    
+                    console.log('오디오 리소스 생성됨');
+                    player.play(resource);
+                    console.log('플레이어 재생 시작');
+                    
+                    connection.subscribe(player);
+                    console.log('오디오 플레이어에 연결됨, 상태:', player.state.status);
+                    
+                    player.on('idle', () => {
+                        console.log('오디오 재생 완료');
+                        isSpeaking = false;
+                        
+                        // 파일 삭제 (선택 사항)
+                        fs.unlink(uniqueFileName, (err) => {
+                            if (err) console.error('임시 파일 삭제 중 오류:', err);
+                        });
+                        
+                        processQueue();
+                    });
+                    
+                    player.on('error', (err) => {
+                        console.error('플레이어 오류:', err);
+                        isSpeaking = false;
+                        processQueue();
+                    });
+                } catch (playError) {
+                    console.error('오디오 재생 중 오류:', playError);
+                    isSpeaking = false;
+                    processQueue();
+                }
             });
         });
     } catch (err) {
