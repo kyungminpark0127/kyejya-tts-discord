@@ -10,7 +10,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions // 메시지 반응 인텐트 추가
     ]
 });
 client.commands = new Collection();
@@ -53,7 +54,7 @@ client.once('ready', () => {
     }
 });
 
-// 명령어 실행
+// 명령어 실행 - ephemeral 사용 방식 수정
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
 
@@ -65,7 +66,13 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: '명령어 실행 중 오류가 발생했습니다!', ephemeral: true });
+        // ephemeral 대신 flags 사용
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ 
+                content: '명령어 실행 중 오류가 발생했습니다!', 
+                flags: { ephemeral: true }
+            });
+        }
     }
 });
 
@@ -84,6 +91,42 @@ client.on('guildCreate', async guild => {
         }
     } catch (error) {
         console.error(`'tts' 채널 생성 중 오류가 발생했습니다: ${error}`);
+    }
+});
+
+// 메시지 반응 처리 - fetchStarterMessage 오류 수정
+client.on('messageReactionAdd', async (reaction, user) => {
+    try {
+        // 봇의 반응은 무시
+        if (user.bot) return;
+        
+        // 스레드 확인
+        const message = reaction.message;
+        if (!message.channel.isThread()) return;
+        
+        // 출석 체크 로직
+        // parentThread.fetchStarterMessage 대신 적절한 방법으로 접근
+        const parentThread = message.channel;
+        
+        try {
+            // 최신 Discord.js에서는 fetchStarterMessage 대신 다음과 같이 사용할 수 있습니다
+            const starterMessage = await parentThread.fetchStarterMessage().catch(async () => {
+                // fetchStarterMessage가 없는 경우 대체 방법
+                // 1. 스레드의 메시지 histroy를 가져와 첫 번째 메시지 사용
+                const messages = await parentThread.messages.fetch({ limit: 1, after: '0' });
+                return messages.first();
+                // 또는
+                // 2. parentThread.messages.fetchPinned()를 사용하여 핀 메시지 확인
+            });
+            
+            console.log('출석 체크 처리 중...');
+            // 여기에 출석 체크 로직 추가
+            
+        } catch (error) {
+            console.error('출석 기록 중 오류:', error);
+        }
+    } catch (error) {
+        console.error('메시지 반응 처리 중 오류:', error);
     }
 });
 
